@@ -29,39 +29,26 @@ class PositionalEncoder(nn.Module):
             return source[:, :length]
 
         self.splice_by_size = splice_by_size
-#     def forward(self, x):
-#         if(x.shape[1] > self._max_seq_length):
-#             logging.warn("Input longer than maximum supported length for PE detected. Build a model with a larger input_max_length limit if you want to keep the input; or ignore if you want the input trimmed")
-#             x = x[:, x:self._max_seq_length]
-        
-#         x = x * math.sqrt(self.d_model)
-        
-#         spliced_pe = self.splice_by_size(self.pe, x) # self.pe[:, :x.shape[1]]
-# #        pe = Variable(spliced_pe, requires_grad=False)
-#         pe = spliced_pe.requires_grad_(False)
-        
-# #        if x.is_cuda: # remove since it is a sub nn.Module
-# #            pe.cuda()
-# #        assert all([xs == ys for xs, ys in zip(x.shape[1:], pe.shape[1:])]), "{} - {}".format(x.shape, pe.shape)
-
-#         x = x + pe
-#         x = self.dropout(x)
-        
-#         return x
     def forward(self, x):
-        if x.shape[1] > self._max_seq_length:
+        if(x.shape[1] > self._max_seq_length):
             logging.warn("Input longer than maximum supported length for PE detected. Build a model with a larger input_max_length limit if you want to keep the input; or ignore if you want the input trimmed")
-            x = x[:, :self._max_seq_length]  # Sửa dòng này
+            x = x[:, x:self._max_seq_length]
         
         x = x * math.sqrt(self.d_model)
         
-        spliced_pe = self.splice_by_size(self.pe, x)  # self.pe[:, :x.shape[1]]
+        spliced_pe = self.splice_by_size(self.pe, x) # self.pe[:, :x.shape[1]]
+#        pe = Variable(spliced_pe, requires_grad=False)
         pe = spliced_pe.requires_grad_(False)
         
+#        if x.is_cuda: # remove since it is a sub nn.Module
+#            pe.cuda()
+#        assert all([xs == ys for xs, ys in zip(x.shape[1:], pe.shape[1:])]), "{} - {}".format(x.shape, pe.shape)
+
         x = x + pe
         x = self.dropout(x)
         
         return x
+    
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, heads, d_model, dropout=0.1):
