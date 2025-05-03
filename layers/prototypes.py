@@ -29,7 +29,6 @@ class PositionalEncoder(nn.Module):
             return source[:, :length]
 
         self.splice_by_size = splice_by_size
-    
 #     def forward(self, x):
 #         if(x.shape[1] > self._max_seq_length):
 #             logging.warn("Input longer than maximum supported length for PE detected. Build a model with a larger input_max_length limit if you want to keep the input; or ignore if you want the input trimmed")
@@ -49,20 +48,20 @@ class PositionalEncoder(nn.Module):
 #         x = self.dropout(x)
         
 #         return x
-def forward(self, x):
-    if x.shape[1] > self._max_seq_length:
-        logging.warn("Input longer than maximum supported length for PE detected. Build a model with a larger input_max_length limit if you want to keep the input; or ignore if you want the input trimmed")
-        x = x[:, :self._max_seq_length]  # Sửa dòng này
-    
-    x = x * math.sqrt(self.d_model)
-    
-    spliced_pe = self.splice_by_size(self.pe, x)  # self.pe[:, :x.shape[1]]
-    pe = spliced_pe.requires_grad_(False)
-    
-    x = x + pe
-    x = self.dropout(x)
-    
-    return x
+    def forward(self, x):
+        if x.shape[1] > self._max_seq_length:
+            logging.warn("Input longer than maximum supported length for PE detected. Build a model with a larger input_max_length limit if you want to keep the input; or ignore if you want the input trimmed")
+            x = x[:, :self._max_seq_length]  # Sửa dòng này
+        
+        x = x * math.sqrt(self.d_model)
+        
+        spliced_pe = self.splice_by_size(self.pe, x)  # self.pe[:, :x.shape[1]]
+        pe = spliced_pe.requires_grad_(False)
+        
+        x = x + pe
+        x = self.dropout(x)
+        
+        return x
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, heads, d_model, dropout=0.1):
