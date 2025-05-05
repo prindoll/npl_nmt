@@ -156,7 +156,7 @@ class Decoder(nn.Module):
         super().__init__()
         self.N = N
         self.embed = nn.Embedding(vocab_size, d_model)
-        self.pe = layers.PositionalEncoder(d_model, dropout=dropout, max_seq_length=max_seq_length)
+        self.pe = layers.RotaryPositionalEncoder(d_model, dropout=dropout, max_seq_length=max_seq_length)
         self.layers = get_clones(DecoderLayer(d_model, heads, dropout), N)
         self.norm = layers.Norm(d_model)
 
