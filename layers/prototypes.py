@@ -5,7 +5,51 @@ import torch.nn.functional as functional
 import math
 import logging
 
-class PositionalEncoder(nn.Module):
+# class PositionalEncoder(nn.Module):
+#     def __init__(self, d_model, max_seq_length=200, dropout=0.1):
+#         super().__init__()
+        
+#         self.d_model = d_model
+#         self.dropout = nn.Dropout(dropout)
+#         self._max_seq_length = max_seq_length
+        
+#         pe = torch.zeros(max_seq_length, d_model)
+        
+#         for pos in range(max_seq_length):
+#             for i in range(0, d_model, 2):
+#                 pe[pos, i] = math.sin(pos/(10000**(2*i/d_model)))
+#                 pe[pos, i+1] = math.cos(pos/(10000**((2*i+1)/d_model)))
+#         pe = pe.unsqueeze(0)        
+#         self.register_buffer('pe', pe)
+
+#         @torch.jit.script
+#         def splice_by_size(source, target):
+#             """Custom function to splice the source by target's second dimension. Required due to torch.Size not a torchTensor. Why? hell if I know."""
+#             length = target.size(1);
+#             return source[:, :length]
+
+#         self.splice_by_size = splice_by_size
+#     def forward(self, x):
+#         if(x.shape[1] > self._max_seq_length):
+#             logging.warn("Input longer than maximum supported length for PE detected. Build a model with a larger input_max_length limit if you want to keep the input; or ignore if you want the input trimmed")
+#             x = x[:, x:self._max_seq_length]
+        
+#         x = x * math.sqrt(self.d_model)
+        
+#         spliced_pe = self.splice_by_size(self.pe, x) # self.pe[:, :x.shape[1]]
+# #        pe = Variable(spliced_pe, requires_grad=False)
+#         pe = spliced_pe.requires_grad_(False)
+        
+# #        if x.is_cuda: # remove since it is a sub nn.Module
+# #            pe.cuda()
+# #        assert all([xs == ys for xs, ys in zip(x.shape[1:], pe.shape[1:])]), "{} - {}".format(x.shape, pe.shape)
+
+#         x = x + pe
+#         x = self.dropout(x)
+        
+#         return x
+
+class RotaryPositionalEncoder(nn.Module):
     def __init__(self, d_model, max_seq_length=200, dropout=0.1):
         super().__init__()
         
@@ -13,38 +57,58 @@ class PositionalEncoder(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self._max_seq_length = max_seq_length
         
-        pe = torch.zeros(max_seq_length, d_model)
+        # Ensure d_model is even for RoPE (required for splitting into pairs)
+        assert d_model % 2 == 0, "d_model must be even for RoPE"
         
-        for pos in range(max_seq_length):
-            for i in range(0, d_model, 2):
-                pe[pos, i] = math.sin(pos/(10000**(2*i/d_model)))
-                pe[pos, i+1] = math.cos(pos/(10000**((2*i+1)/d_model)))
-        pe = pe.unsqueeze(0)        
-        self.register_buffer('pe', pe)
+        # Precompute frequency terms for RoPE
+        self._freqs = self._compute_freqs(d_model, max_seq_length)
+        self.register_buffer('freqs', self._freqs)
 
-        @torch.jit.script
-        def splice_by_size(source, target):
-            """Custom function to splice the source by target's second dimension. Required due to torch.Size not a torchTensor. Why? hell if I know."""
-            length = target.size(1);
-            return source[:, :length]
+    def _compute_freqs(self, d_model, max_seq_length):
+        """Compute the frequency terms for RoPE."""
+        theta = 10000.0 ** (-torch.arange(0, d_model, 2) / d_model)
+        positions = torch.arange(max_seq_length).unsqueeze(1)
+        freqs = positions * theta.unsqueeze(0)
+        return freqs
 
-        self.splice_by_size = splice_by_size
+    def _apply_rotary_embedding(self, x):
+        """Apply rotary embeddings to the input tensor."""
+        seq_len = x.size(1)
+        freqs = self.freqs[:seq_len].to(x.device)
+        
+        # Split x into pairs for rotation
+        x_even = x[..., 0::2]  # Even-indexed dimensions
+        x_odd = x[..., 1::2]   # Odd-indexed dimensions
+        
+        # Compute angles and apply rotation
+        angles = freqs
+        cos_theta = torch.cos(angles)
+        sin_theta = torch.sin(angles)
+        
+        # Rotate: x_even' = x_even * cos - x_odd * sin
+        #         x_odd'  = x_even * sin + x_odd * cos
+        x_even_rot = x_even * cos_theta - x_odd * sin_theta
+        x_odd_rot = x_even * sin_theta + x_odd * cos_theta
+        
+        # Interleave the rotated pairs back
+        x_rot = torch.stack([x_even_rot, x_odd_rot], dim=-1)
+        x_rot = x_rot.view(*x.shape)
+        
+        return x_rot
+
     def forward(self, x):
-        if(x.shape[1] > self._max_seq_length):
-            logging.warn("Input longer than maximum supported length for PE detected. Build a model with a larger input_max_length limit if you want to keep the input; or ignore if you want the input trimmed")
-            x = x[:, x:self._max_seq_length]
+        # Check for sequence length
+        if x.shape[1] > self._max_seq_length:
+            logging.warn("Input longer than maximum supported length for RoPE detected. Trimming input.")
+            x = x[:, :self._max_seq_length]
         
+        # Scale input embeddings
         x = x * math.sqrt(self.d_model)
         
-        spliced_pe = self.splice_by_size(self.pe, x) # self.pe[:, :x.shape[1]]
-#        pe = Variable(spliced_pe, requires_grad=False)
-        pe = spliced_pe.requires_grad_(False)
+        # Apply rotary embeddings
+        x = self._apply_rotary_embedding(x)
         
-#        if x.is_cuda: # remove since it is a sub nn.Module
-#            pe.cuda()
-#        assert all([xs == ys for xs, ys in zip(x.shape[1:], pe.shape[1:])]), "{} - {}".format(x.shape, pe.shape)
-
-        x = x + pe
+        # Apply dropout
         x = self.dropout(x)
         
         return x
