@@ -45,6 +45,6 @@ dropout: 0.1
 batch_size: 64
 epochs: 20
 printevery: 200
-save_checkpoint_epochs: 10
+save_checkpoint_epochs: 1
 maximum_saved_model_eval: 5
 maximum_saved_model_train: 5

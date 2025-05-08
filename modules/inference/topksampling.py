@@ -134,7 +134,7 @@ class TopKSampling(DecodeStrategy):
         else:
             return sentences
 
-    def translate_batch_sentence(self, src, src_lang=None, trg_lang=None, field_processed=False, src_size_limit=None, output_tokens=False, debug=False):
+    def translate_batch_sentence(self, src, src_lang=None, trg_lang=None, field_processed=False, src_size_limit=None, output_tokens=False, debug=False, replace_unk=False):
         """Translate a batch of sentences using top-k sampling.
         Args:
             src: The batch of sentences to be translated (list of str or tensor).
@@ -144,6 +144,7 @@ class TopKSampling(DecodeStrategy):
             src_size_limit: Maximum source length (optional).
             output_tokens: If True, return tokens instead of joined sentences.
             debug: If True, print debug information.
+            replace_unk: If True, replace unknown tokens (default: False).
         Returns:
             Translated sentences (list of str or list of tokens).
         """
