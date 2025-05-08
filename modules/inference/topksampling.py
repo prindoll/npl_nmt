@@ -9,6 +9,7 @@ from torch.nn.utils.rnn import pad_sequence
 import modules.constants as const
 from utils.misc import no_peeking_mask
 from utils.data import generate_language_token
+from modules.inference.decode_strategy import DecodeStrategy  # Import DecodeStrategy
 
 class TopKSampling(DecodeStrategy):
     def __init__(self, model, max_len, device, k=50, temperature=0.7):
